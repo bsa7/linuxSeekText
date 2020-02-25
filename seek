@@ -1,0 +1,97 @@
+#!/usr/bin/env ruby
+require 'colorize'
+require 'awesome_print'
+
+def puts_additional_strings(file:, string_number:)
+  file_name = "#{Dir.pwd}"
+end
+
+def highlight(str, regex, color)
+  regex_result = str[regex]
+  if regex_result
+    str.sub(regex_result, regex_result.send(color))
+  else
+    str
+  end
+end
+
+def highlight_args(str, args)
+  hit_info = str
+  args.each do |arg|
+    hit_info = highlight(hit_info, Regexp.new(arg), :yellow)
+  end
+  hit_info
+end
+
+# Поиск в файлах вхождений нескольких слов/регулярок
+# Пример вызова seek console log '\bnextState\b'
+
+#output1 = 
+arg_list = ARGV.reject{ |x| x[/^--/] }.map { |x| x.to_s.yellow }.join("', '")
+named_args = ARGV.select{ |x| x[/^--/] }
+named_params = {}
+named_args.each do |arg_string|
+  key, value = arg_string.split('=')
+  named_params[key.gsub(/-/, '_').gsub(/^__/, '').to_sym] = value
+end
+
+puts "Поиск файлов, в которых встречаются слова: '#{arg_list}'"
+puts "  Допустимые параметры:"
+puts "    --only=regexp - Регулярка для фильтра по имени файла, например, --only=\.jsx?$"
+puts "    --exclude=regexp - Регулярка для исключений по имени файла, например, --exclude=\.svg?$"
+search_results = []
+
+
+ARGV.reject{ |x| x[/^--/] }.each_with_index do |arg, index|
+  search_results.push(`/home/slon/sysutils/gr '#{arg}'`.split(/\n/))
+end
+
+file_names = search_results.map do |search_result|
+  search_result.map do |search_row|
+    search_row[/^.+?(?=:)/]
+  end.uniq.reject(&:nil?)
+end
+
+result = file_names.reduce(:&)
+search_results_flatten = search_results.flatten.uniq
+if named_params[:only]
+  result = result.reject { |file_name| !file_name[Regexp.new(named_params[:only])] }
+end
+if named_params[:exclude]
+  result = result.reject { |file_name| file_name[Regexp.new(named_params[:exclude])] }
+end
+
+
+result = result&.map do |file_name|
+  {
+    file: file_name,
+    hits: search_results_flatten.select { |item|
+      item["#{file_name}:"]
+    }.map { |item|
+      item.sub(file_name, '') 
+    }.map { |item|
+      highlight_args(item, ARGV.reject{ |x| x[/^--/] })
+    }.sort_by { |item|
+      hits = item.scan(/\[1;/).length
+      hits * 1000 + item[/\d+/].to_i
+    }
+  }
+end
+
+if result && result.length > 0
+  puts "Найдено файлов: #{result.length.to_s.green}"
+  result.each do |item|
+    puts item[:file].magenta
+    item[:hits].each do |hit|
+      hit_info = highlight(hit, /:\d+:/, :green)
+      string_number = hit_info[/:\d+:/]&.gsub(':', '')
+      if string_number
+        puts "  #{hit_info}"
+        puts_additional_strings({ file: item[:file], string_number: string_number })
+      end
+    end
+  end
+  puts "Самые удачные совпадения - внизу списка!".cyan
+else
+  puts "нет результатов".cyan
+end
