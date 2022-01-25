@@ -38,6 +38,7 @@ end
 puts "Поиск файлов, в которых встречаются слова: '#{arg_list}'"
 puts "  Допустимые параметры:"
 puts "    --only=regexp - Регулярка для фильтра по имени файла, например, --only=\.jsx?$"
+puts "    --filenames-only - Выдача только имён файлов"
 puts "    --exclude=regexp - Регулярка для исключений по имени файла, например, --exclude=\.svg?$"
 search_results = []
 
@@ -87,7 +88,7 @@ if result && result.length > 0
       string_number = hit_info[/:\d+:/]&.gsub(':', '')
       if string_number
         puts "  #{hit_info}"
-        puts_additional_strings({ file: item[:file], string_number: string_number })
+        puts_additional_strings(file: item[:file], string_number: string_number)
       end
     end
   end
